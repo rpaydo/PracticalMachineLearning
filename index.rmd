@@ -1,0 +1,109 @@
+## Machine Learning Assignment
+
+### Assignment Objective
+
+The purpose of this assignment is to develop a model that will predict how well a person can  
+perform a bar bell lift using data from multiple accelerometers.  The data used to produce  
+the model comes from the Weight Lifting Exercise dataset from the Human Activity Recognition  
+project.  The data was collected from a set of accelerometers connected to the arm, forearm,  
+belt, and dumbbell while five participants performed one set of 10 unilateral dumbbell  
+biceps curls.
+
+### Analysis Steps
+
+The first section of code loads the caret package that will be used for model development and  
+loads two datasets from the website: a set complete with exercise classifications and a set  
+that has not been classified and that will be used for model verification.
+
+```{r}
+library(caret)
+alldata=read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"))
+quiz=read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"))
+```
+
+Performing a few data summaries reveals that many of the variables in the dataset have a  
+large number of readings that are either blank or NA.  In addition, there are a few variables  
+that serve as row markers or timestamps.  Prior to model development, we will eliminate these   
+variables from the dataset.  This will reduce the total number of variables from 160 to 55 and  
+will speed up the model development steps.
+
+```{r}
+mydata <- alldata[,colSums(is.na(alldata))<19000]
+mydata <- mydata[,colSums(mydata=="")<19000]
+mydata=mydata[,6:60]
+```
+
+Now that the data has been cleaned, we will divide the data into a training set to build the  
+model and a testing set to cross-validate the model.  We will use random subsetting without  
+replacement.  For reproducibility purposes, we will set a seed in R prior to making the split.
+
+```{r}
+set.seed(123)
+inTrain=createDataPartition(y=mydata$classe,p=0.75,list=FALSE)
+training=mydata[inTrain,]
+testing=mydata[-inTrain,]
+```
+
+In the next step, we will use the training set to build a model.  for this exercise, we will  
+use a random forest model.  The random forest technique builds multiple decision trees with  
+the data and uses the multiple trees to vote for the correct class.  The model can take  
+longer to generate but is very accurate.  For this model, the output variable is classe.  We  
+will use all remaining variables in the dataset as predictors.  Again, for reproducibility  
+purposes,  we will set a seed in R so that the exact random forest can be recreated.
+
+```{r}
+set.seed(516)
+modFitrf=train(classe~.,data=training,method="rf")
+```
+
+Now that the model has been built, we will validate the accuracy of the model by using it  
+to predict classe values in the testing set that we created with the earlier split.  Since  
+the testing set already contains values for classe, we can compare our predicted values to  
+the actual values from the dataset to see how accurate the model is.  We will generate a  
+confusion matrix that will show how often the model agrees with the actual values (accuracy).  
+We will also be able to see various statistics for each of the five potential outcomes,  
+including sensitivity, specificity.
+
+```{r}
+pred=predict(modFitrf,testing)
+confusionMatrix(pred,testing$classe)
+```
+
+Since the testing set was not utilized to build the model, the model's performance on the  
+test set will give a good idea of what its out of sample error would be.  Based on the  
+confusion matrix, the model had an accuracy of 99.9% on the testing set and  
+miscategorized only 5 samples out of 4904.  The No information rate shows how accurate we  
+would expect to be in making predictions with no  model at all.  The random forest model  
+improves that accuracy by 71%, which is statistically significant based on the p-value.  The  
+confidence interval on the accuracy is also very small due to the large number of samples in  
+the testing set.  The individual sensitivities and specificities for each category are also 
+extremely high.  Overall, the model performed extremely well.
+
+Next, we can look at which variables in the model were the most important for the model.  The  
+most important variable was num window followed by Toll belt.  The rest of the variables,  
+ranked by importance, can be seen in the plot below:
+
+```{r, echo=FALSE}
+plot(varImp(modFitrf))
+```
+
+Now that we have verified the performance of the model through cross-validation and gained  
+some insight into which variables had the biggest impact on the model, the final step is to  
+use the model to predict categories for the 20 samples for the quiz.  Unlike the validation  
+on the testing set, we do not already know the categories for the quiz samples.  The  
+predictions for these samples are as follows:
+
+```{r}
+predquiz=predict(modFitrf,quiz)
+predquiz
+```
+
+These answers were submitted through the Coursera assessment and were all correct.
+
+###Conclusion
+
+The model was validated twice: once on the testing set and once on the quiz set and was  
+extremely accurate in both.  Based on these results, it is fair to say that the sensors  
+in the accelerometers can be used to accurately say whether a dumbbell lift is being performed  
+correctly.  A customer can have confidence that he is performing the exercise correctly  
+as long as his sensors do not indicate otherwise.
